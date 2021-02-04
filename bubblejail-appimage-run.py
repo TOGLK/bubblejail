@@ -6,9 +6,18 @@ from asyncio.subprocess import DEVNULL, PIPE
 loop = get_event_loop()
 
 
+async def run_bubblejail(mount_point: str, instance_name: str) -> None:
+    bubblejail_subprocess = await create_subprocess_exec(
+        '/usr/bin/env', f'BUBBLEJAIL_DEBUG_ROOT_SHARE={mount_point}',
+        'python3', '-X', 'dev', './dev.py',  # change to 'bubblejail'
+        'run', instance_name, mount_point + '/AppRun',
+    )
+    await bubblejail_subprocess.communicate()
+
+
 async def startup(appimage_path: str, instance_name: str) -> None:
     mount_subprocess = await create_subprocess_exec(
-        '/usr/bin/env',  'appimagetool', '--appimage-mount', appimage_path,
+        appimage_path, '--appimage-mount', appimage_path,
         stdin=DEVNULL, stdout=PIPE,
     )
 
@@ -18,13 +27,15 @@ async def startup(appimage_path: str, instance_name: str) -> None:
         mount_subprocess.stdout.readline(),
         timeout=1)
 
-    mount_point = mount_point_bytes.decode('utf-8')
+    assert mount_point_bytes
 
-    bubblejail_subprocess = await create_subprocess_exec(
-        '/usr/bin/env', 'BUBBLEJAIL_DEBUG_ROOT_SHARE', mount_point,
-        'bubblejail', 'run', mount_point + '/AppRun',
-    )
-    await bubblejail_subprocess.communicate()
+    mount_point = mount_point_bytes.decode('utf-8')[:-1]
+
+    try:
+        await run_bubblejail(mount_point, instance_name)
+    finally:
+        mount_subprocess.terminate()
+        await mount_subprocess.communicate()
 
 
 def main() -> None:
