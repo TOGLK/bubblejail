@@ -548,6 +548,14 @@ class BubblejailInit:
         # Change directory
         self.bwrap_options_args.extend(('--chdir', '/home/user'))
 
+        try:
+            debug_root_share = environ['BUBBLEJAIL_DEBUG_ROOT_SHARE']
+        except KeyError:
+            return
+
+        self.bwrap_options_args.extend(
+            ('--bind', debug_root_share, debug_root_share))
+
     def get_args_file_descriptor(self) -> int:
         options_null = '\0'.join(self.bwrap_options_args)
 
